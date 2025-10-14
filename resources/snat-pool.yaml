@@ -1,0 +1,24 @@
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKSnatpool
+metadata:
+  name: "red-snat"
+spec:
+  name: "red-snat"
+  addressList:
+    - - 192.0.2.100
+      - 2001::192:0:2:100
+    - - 192.0.2.101
+      - 2001::192:0:2:101
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKSnatpool
+metadata:
+  name: "blue-snat"
+spec:
+  name: "blue-snat"
+  addressList:
+    - - 192.0.2.110
+      - 2001::192:0:2:110
+    - - 192.0.2.111
+      - 2001::192:0:2:111

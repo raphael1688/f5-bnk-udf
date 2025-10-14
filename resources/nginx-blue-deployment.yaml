@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: blue
+  labels:
+    app: nginx-tcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp
+    spec:
+      containers:
+      - name: nginx-tcp
+        image: f5devcentral/f5-demo-httpd:nginx
+        ports:
+        - containerPort: 80
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-app-svc
+  namespace: blue
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx-tcp
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: my-l4route-tcp-gateway
+  namespace: blue
+spec:
+  addresses:
+  - type: "IPAddress"
+    value: 198.20.20.100
+  gatewayClassName: f5-gateway-class
+  listeners:
+  - name: nginx
+    protocol: TCP
+    port: 80
+    allowedRoutes:
+      kinds:
+      - kind: L4Route
+        group: gateway.k8s.f5net.com
+---
+apiVersion: gateway.k8s.f5net.com/v1
+kind: L4Route
+metadata:
+  name: l4-tcp-app
+  namespace: blue
+spec:
+  protocol: TCP
+  parentRefs:
+  - name: my-l4route-tcp-gateway
+    sectionName: nginx
+  rules:
+  - backendRefs:
+    - name: nginx-app-svc
+      namespace: blue
+      port: 80

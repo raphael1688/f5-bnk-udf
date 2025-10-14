@@ -1,0 +1,33 @@
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: red-egress
+  namespace: default
+spec:
+  dualStackEnabled: true
+  egressSnatpool: red-snat
+  pseudoCNIConfig:
+    appPodInterface: eth0
+    namespaces:
+    - red
+    vxlan:
+      create: true
+      tmmInterfaceName: egress
+  snatType: SRC_TRANS_SNATPOOL
+---
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: blue-egress
+  namespace: default
+spec:
+  dualStackEnabled: true
+  egressSnatpool: blue-snat
+  pseudoCNIConfig:
+    appPodInterface: eth0
+    namespaces:
+    - blue
+    vxlan:
+      create: true
+      tmmInterfaceName: egress
+  snatType: SRC_TRANS_SNATPOOL

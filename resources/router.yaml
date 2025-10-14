@@ -1,0 +1,224 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-config
+data:
+  daemons: |
+    # This file tells the frr package which daemons to start.
+    # It also specifies the parameters to pass to them.
+    bgpd=yes
+    vtysh_enable=yes
+    zebra_options="  -A 127.0.0.1 -s 90000000"
+    bgpd_options="   -A 127.0.0.1"
+    staticd_options="-A 127.0.0.1"
+
+  bgpd.conf: |
+    !
+    frr defaults traditional
+    hostname router
+    log file /tmp/frr.log
+    !
+    debug bgp neighbor-events
+    debug bgp update-groups
+    debug bgp updates in
+    debug bgp updates out
+    debug bgp zebra
+    debug bgp graceful-restart
+    !
+    router bgp 65500
+     bgp router-id 192.0.2.250
+     no bgp ebgp-requires-policy
+     no bgp default ipv4-unicast
+     neighbor SPK-PODS peer-group
+     neighbor SPK-PODS remote-as external
+     bgp listen range 192.0.2.0/24 peer-group SPK-PODS
+     bgp listen range 2001::192:0:2:0/112 peer-group SPK-PODS
+     neighbor SPK-STORAGE peer-group
+     neighbor SPK-STORAGE remote-as external
+     bgp listen range 198.18.0.0/24 peer-group SPK-STORAGE
+     bgp listen range 2001::198:18:0:0/112 peer-group SPK-STORAGE
+     !
+     address-family ipv4 unicast
+      network 198.51.100.0/24
+      network 203.0.113.0/24
+      neighbor SPK-PODS activate
+      neighbor SPK-PODS soft-reconfiguration inbound
+      neighbor SPK-STORAGE activate
+      neighbor SPK-STORAGE soft-reconfiguration inbound
+     exit-address-family
+     !
+     address-family ipv6 unicast
+      network 2001::198:51:100:0/112
+      network 2001::203:0:113:0/112
+      neighbor SPK-PODS activate
+      neighbor SPK-PODS soft-reconfiguration inbound
+      neighbor SPK-STORAGE activate
+      neighbor SPK-STORAGE soft-reconfiguration inbound
+     exit-address-family
+    !
+    exit
+
+  staticd.conf: ""
+  zebra.conf: ""
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: router
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+      {
+        "name": "client-net",
+        "interface": "client-net",
+        "ips": ["198.51.100.250/24", "2001::198:51:100:250/112"]
+      },
+      {
+        "name": "node-egress",
+        "interface": "node-egress",
+        "ips": ["198.18.200.250/24", "2001::198:18:200:250/112"]
+      },
+      {
+        "name": "spk-egress",
+        "interface": "tmm-egress",
+        "ips": ["198.18.100.250/24", "2001::198:18:100:250/112"]
+      },
+      {
+        "name": "storage-net",
+        "interface": "storage-net",
+        "ips": ["203.0.113.250/24", "2001::203:0:113:250/112"]
+      }
+    ]'
+spec:
+  initContainers:
+  - name: frr-network-setup
+    image: jonlabelle/network-tools
+    imagePullPolicy: IfNotPresent
+    command:
+    - /bin/bash
+    - -c
+    - |
+        vrf_create_if_not_exists() {
+          local vrf_name=$1
+          local table_id=$2
+  
+          if ! ip link show type vrf | grep -q ${vrf_name}; then
+            echo "Creating VRF ${vrf_name} with table ID ${table_id}..."
+            ip link add ${vrf_name} type vrf table ${table_id}
+            ip route add table ${table_id} unreachable default metric 4278198272
+            ip link set ${vrf_name} up
+          else
+            echo "VRF ${vrf_name} already exists."
+          fi
+        }
+  
+        vlan_create_if_not_exists() {
+          local parent_if=$1
+          local vlan_id=$2
+          local vrf_name=$3
+          local vlan_if="v${vlan_id}"
+  
+          if ! ip link show | grep -q ${vlan_if}; then
+            echo "Creating VLAN ${vlan_if} on ${parent_if} with ID ${vlan_id}..."
+            ip link add link ${parent_if} name ${vlan_if} type vlan id ${vlan_id}
+            # ip link set dev ${vlan_if} master ${vrf_name}
+            ip link set ${vlan_if} up
+          else
+            echo "VLAN ${vlan_if} already exists."
+          fi
+        }
+  
+        add_ip_to_vlan() {
+          local vlan_if=$1
+          local ip_address=$2
+  
+          if ! ip addr show dev ${vlan_if} | grep -q ${ip_address}; then
+            echo "Adding IP address ${ip_address} to ${vlan_if}..."
+            ip addr add ${ip_address} dev ${vlan_if}
+          else
+            echo "IP address ${ip_address} is already assigned to ${vlan_if}."
+          fi
+        }
+  
+        vrf_and_vlan_setup() {
+          local vrf_name=$1
+          local table_id=$2
+          local parent_if=$3
+          local vlan_id=$4
+          local ip_address=$5
+          local vlan_if="v${vlan_id}"
+          # Flush parent interface IP addresses
+          ip a flush dev ${parent_if}
+          ip -6 a flush dev ${parent_if}
+  
+          # vrf_create_if_not_exists ${vrf_name} ${table_id}
+          vlan_create_if_not_exists ${parent_if} ${vlan_id} ${vrf_name}
+          add_ip_to_vlan ${vlan_if} ${ip_address}
+        }
+
+        
+  
+        vrf_and_vlan_setup client 10 client-net 1001 "198.51.100.250/24"
+        vrf_and_vlan_setup client 10 client-net 1001 "2001::198:51:100:250/112"
+        vrf_and_vlan_setup spk-client 20 client-net 2002 "192.0.2.250/24"
+        vrf_and_vlan_setup spk-client 20 client-net 2002 "2001::192:0:2:250/112"
+        vrf_and_vlan_setup spk-storage 30 client-net 3003 "198.18.0.250/24"
+        vrf_and_vlan_setup spk-storage 30 client-net 3003 "2001::198:18:0:250/112"
+
+        ## The net-attach-def do not specify IPAM so we need to
+        ## configure network IP addresses explicity.
+        ip a a 198.18.200.250/24 dev node-egress
+        ip a a 2001::198:18:200:250/112 dev node-egress
+        ip a a 198.18.100.250/24 dev tmm-egress
+        ip a a 2001::198:18:100:250/112 dev tmm-egress
+        ip a a 203.0.113.250/24 dev storage-net
+        ip a a 2001::203:0:113:250/112 dev storage-net
+        # Create VRF for node and tmm underlay used to establish VXLAN tunnels.
+        #ip link add spk-underlay type vrf table 40
+        #ip route add table 40 unreachable default metric 4278198272
+        #ip link set spk-underlay up
+        #ip link set tmm-egress master spk-underlay
+        #ip r a 198.18.100.0/24 dev spk-underlay
+        #ip r a 198.18.200.0/24 dev node-egress vrf spk-underlay
+
+
+        # Leak client-side and storage network routes to the TMM facing vrf.
+        #ip r a 198.51.100.0/24 dev v1001 table 20
+        #ip r a 203.0.113.0/24 dev storage-net table 30
+
+        # Leak TMM virtual servers routes to client
+        #ip r a vrf client 198.19.19.0/24 dev spk-client
+
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -w net.ipv6.conf.all.forwarding=1
+        sysctl -w net.ipv4.fib_multipath_hash_policy=1
+
+
+    securityContext:
+      privileged: True
+      allowPrivilegeEscalation: True
+      runAsUser: 0
+      capabilities:
+        add: ["NET_ADMIN"]
+  containers:
+  - env:
+    #image: artifactory.f5net.com/dockerhub-remote/frrouting/frr:v8.4.0
+    image: quay.io/frrouting/frr:8.4.6
+    imagePullPolicy: IfNotPresent
+    name: frr
+    securityContext:
+      privileged: true
+      allowPrivilegeEscalation: true
+      capabilities:
+        add:
+        - NET_ADMIN
+        - IPC_LOCK
+      runAsUser: 0
+    volumeMounts:
+      - name: router-config
+        mountPath: /etc/frr/
+  volumes:
+    - name: router-config
+      configMap:
+        name: router-config

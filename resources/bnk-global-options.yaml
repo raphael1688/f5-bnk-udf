@@ -1,0 +1,9 @@
+apiVersion: k8s.f5net.com/v1
+kind: F5BigGlobalOptions
+metadata:
+  name: global-options
+  namespace: default
+spec:
+  firewall:
+    defaultAction: accept
+    defaultActionLog: true

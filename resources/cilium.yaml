@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: helm-service-account
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: helm-service-account-binding
+subjects:
+- kind: ServiceAccount
+  name: helm-service-account
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cilium-helm-install
+  namespace: kube-system
+spec:
+  ttlSecondsAfterFinished: 10
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 8.8.8.8
+          - 1.1.1.1
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+      serviceAccountName: helm-service-account
+      containers:
+      - name: helm
+        image: alpine/helm:3.16.4
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -e
+            helm repo add cilium https://helm.cilium.io/
+            helm repo update
+            helm install cilium cilium/cilium \
+              --version=1.16.5 \
+              --namespace=kube-system \
+              --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16" \
+              --set=ipam.operator.clusterPoolIPv6PodCIDRList="fd00:10:244::/56" \
+              --set=cni.exclusive=false \
+              --set=ipam.mode=kubernetes \
+              --set=kubeProxyReplacement=false \
+              --set=securityContext.capabilities.ciliumAgent={CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID} \
+              --set=securityContext.capabilities.cleanCiliumState={NET_ADMIN,SYS_ADMIN,SYS_RESOURCE} \
+              --set=cgroup.autoMount.enabled=false \
+              --set=cgroup.hostRoot=/sys/fs/cgroup
+        env:
+        - name: HELM_NAMESPACE
+          value: kube-system
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /root/.kube
+      restartPolicy: Never
+        #restartPolicy: OnFailure
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: /root/.kube
+          type: Directory
+  backoffLimit: 4

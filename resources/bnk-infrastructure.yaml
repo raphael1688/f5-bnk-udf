@@ -1,0 +1,33 @@
+apiVersion: charts.k8s.f5net.com/v1alpha1
+kind: SPKInfrastructure
+metadata:
+  name: bnk-dpu-infra
+spec:
+  networkAttachment:
+  - name: default/external-net
+  - name: default/egress-net
+  platformType: other
+  hugepages: false
+  wholeClusterMode: "enabled"
+  calicoRouter: "default"
+  egress:
+    json:
+      ipPoolCidrInfo:
+        cidrList:
+        - name: vlan_cidr
+          value: "198.18.100.0/24"
+        - name: vlan_ipv6_cidr
+          value: "2001::198:18:100:0/112"
+        - name: node_cidr_ipv4
+          value: "10.11.0.0/16"
+        - name: node_cidr_ipv6
+          value: "fc00:f853:ccd:e793::/64"
+        - name: test_cidr
+          value: ""
+        ipPoolList:
+        - name: pod_cidr_ipv4
+          value: "10.244.0.0/16"
+        - name: pod_cidr_ipv6
+          value: "fd00:10:244::/56"
+        - name: test_pod_cidr
+          value: ""

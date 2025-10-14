@@ -1,0 +1,21 @@
+apiVersion: "k8s.f5net.com/v1"
+kind: F5BigFwPolicy
+metadata:
+  name: firewallpolicy
+  namespace: default
+spec:
+  rule:
+  - name: blue-vip-ingress-rule
+    ipProtocol: tcp
+    destination:
+      addresses:
+      - 198.20.20.100/32
+    logging: true
+    action: reject
+#  - name: sc-rule-tcp-egress
+#    ipProtocol: tcp
+#    source:
+#      addresses:
+#      - 10.128.2.0/23
+#    logging: true
+#    action: accept

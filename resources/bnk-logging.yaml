@@ -1,0 +1,32 @@
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5BigLogHslpub
+metadata:  
+  name: logpublisher
+  namespace: default
+spec:  
+  pool:
+    - name: pool
+      endpoint:
+        - 192.0.2.200:514
+  syslog:
+    - name: syslog
+      format: rfc5424
+      protocol: udp
+      distribution: adaptive
+      pool: pool
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5BigLogProfile
+metadata:  
+  name: logprofile
+  namespace: default
+spec:  
+  publisher: logpublisher
+  firewall:
+    enabled: true
+    network:
+      events:
+        aclMatchAccept: true
+        aclMatchDrop: true
+        aclMatchReject: true

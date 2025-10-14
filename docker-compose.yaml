@@ -1,0 +1,69 @@
+name: infra
+
+networks:
+  client-net:
+    ipam:
+      config:
+      - subnet: 198.51.100.0/24
+  external-net:
+    external: true
+
+services:
+  frr:
+    image: quay.io/frrouting/frr:8.4.6
+    hostname: router
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    volumes:
+      - type: bind
+        source: ./frr/bgpd.conf
+        target: /etc/frr/bgpd.conf
+      - type: bind
+        source: ./frr/daemons
+        target: /etc/frr/daemons
+      - type: bind
+        source: ./frr/vtysh.conf
+        target: /etc/frr/vtysh.conf
+    sysctls:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+      net.ipv4.fib_multipath_hash_policy: 1
+    networks:
+      client-net:
+        ipv4_address: 198.51.100.250
+      external-net:
+        ipv4_address: 192.0.2.250
+        ipv6_address: 2001::192:0:2:250
+  client:
+    build:
+      context: ./f5-demo-httpd
+      dockerfile: Dockerfile.nginx
+    hostname: nginx
+    cap_add:
+      - NET_ADMIN
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ip route replace default via 198.51.100.250
+        trap "exit 0" TERM INIT
+        /entrypoint.sh nginx -g "daemon off;"
+    networks:
+      client-net:
+        ipv4_address: 198.51.100.100
+
+  syslog-server:
+    image: rsyslog/syslog_appliance_alpine
+    container_name: syslog-server
+    ports:
+      - "514:514/udp"
+      - "514:514"
+    volumes:
+      - ./rsyslog/rsyslog.conf:/etc/rsyslog.conf
+      - ./rsyslog/logs:/var/log/remote
+    networks:
+      external-net:
+        ipv4_address: 192.0.2.200
+        ipv6_address: 2001::192:0:2:200
