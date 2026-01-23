@@ -1,13 +1,16 @@
 apiVersion: k8s.f5.com/v1
-kind: BNKGatewayClass
+kind: CNEInstance
 metadata:
   labels:
     app.kubernetes.io/name: f5-lifecycle-operator
     app.kubernetes.io/managed-by: kustomize
   name: bnkgatewayclass-sample
 spec:
-  manifestVersion: "2.1.0-3.1736.1-0.1.27"
-  containerPlatform: Generic
+  product:
+    gatewayAPI: false
+    type: BNK
+  manifestVersion: "2.2.0-3.2226.0-0.0.385"
+  wholeCluster: true
   telemetry:
     loggingSubsystem:
       enabled: false
@@ -16,8 +19,8 @@ spec:
   certificate:
     clusterIssuer: bnk-ca-cluster-issuer
   deploymentSize: "Small"
-  image:
-    repository: "repo.f5.com/images"
+  registry:
+    uri: repo.f5.com
     imagePullSecrets:
     - name: far-secret
     imagePullPolicy: Always
@@ -48,15 +51,23 @@ spec:
       enabled: false
       stopOnFail: true
       runAfterSuccess: true
-    pseudoCNI:
+    cneController:
       env:
-      - name: "EXCLUDE_CIDR"
-        value: "10.96.0.0/12,10.244.0.0/16,198.168.20.0/24,10.11.0.0/16"
+      - name: "TMM_DEFAUlT_MTU"
+        value: "1500"
     tmm:
       env:
       - name: "TMM_CALICO_ROUTER"
         value: "default"
+      - name: "TMM_DEFAUlT_MTU"
+        value: "1500"
       - name: "TMM_MAPRES_ADDL_VETHS_ON_DP"
         value: "TRUE"
+      - name: "ZEBOS_STATE"
+        value: legacy
     #  - name: "TMM_LOG_LEVEL"
     #    value: "Debug"
+    pseudoCNI:
+      env:
+      - name: "EXCLUDE_CIDR"
+        value: "10.96.0.0/12,10.244.0.0/16,198.168.20.0/24,10.11.0.0/16"

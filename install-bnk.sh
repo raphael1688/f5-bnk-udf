@@ -29,15 +29,14 @@ done
 export JWT=$(cat ~/.jwt)
 envsubst < resources/flo-value.yaml >/tmp/flo-value.yaml
 unset JWT
-helm upgrade --install flo oci://repo.f5.com/charts/f5-lifecycle-operator --version v1.198.4-0.1.36 -f /tmp/flo-value.yaml --namespace f5-operators
+helm upgrade --install flo oci://repo.f5.com/charts/f5-lifecycle-operator --version v2.9.27-0.2.10 -f /tmp/flo-value.yaml --namespace f5-operators
 
 sleep 10
 kubectl wait --for=condition=Ready pods --all -n default --timeout=120s || true
 sleep 10
 
 echo ""
-echo "Install BIG-IP Next for Kubernetes ..."
-kubectl apply -f resources/bnk-gatewayclass.yaml
-#kubectl apply -f resources/csrc.yaml
+echo "Install CNI instance for Kubernetes ..."
+kubectl apply -f resources/cne-instance.yaml
 sleep 10
 kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=f5-lifecycle-operator -A --timeout=120s || true

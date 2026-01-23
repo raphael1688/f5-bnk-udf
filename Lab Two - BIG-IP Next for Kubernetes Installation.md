@@ -1,5 +1,5 @@
 #### Important - We are taking you through a painful path to instruct. 
-BIG-IP Next for Kubernetes v2.1.0 is organizing the installation into the OLM (operator lifecycle manager) compliant operator you will see in these steps. 
+BIG-IP Next for Kubernetes v2.2.0 is organizing the installation into the OLM (operator lifecycle manager) compliant operator you will see in these steps. 
 ##### STAY CALM and Lab On!
 
 ![[OLM Operators.png]]
