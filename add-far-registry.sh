@@ -26,5 +26,5 @@ kubectl -n f5-operators apply -f ~/far/far-secret.yaml
 kubectl -n f5-utils apply -f ~/far/far-secret.yaml
 kubectl -n default  apply -f ~/far/far-secret.yaml
 
-echo $SERVICE_ACCOUNT_KEY | helm registry login -u _json_key_base64 --password-stdin --password-stdin https://repo.f5.com
+echo $SERVICE_ACCOUNT_KEY | helm registry login -u _json_key_base64 --password-stdin --password-stdin repo.f5.com
 
