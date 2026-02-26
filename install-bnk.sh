@@ -31,9 +31,9 @@ envsubst < resources/flo-value.yaml >/tmp/flo-value.yaml
 unset JWT
 helm upgrade --install flo oci://repo.f5.com/charts/f5-lifecycle-operator --version v2.9.27-0.2.10 -f /tmp/flo-value.yaml --namespace f5-operators
 
-sleep 10
+#sleep 10
 kubectl wait --for=condition=Ready pods --all -n f5-operators --timeout=120s || true
-sleep 10
+#sleep 10
 
 echo ""
 echo "Install CNI instance for Kubernetes ..."
